@@ -318,7 +318,7 @@ code {
   padding: 14px;
 }
 
-.danger-zone div {
+.danger-zone > div:first-child {
   display: grid;
   gap: 4px;
 }
@@ -330,6 +330,13 @@ code {
 .danger-zone span {
   color: #7d5048;
   font-size: 13px;
+}
+
+.danger-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
 .storage-page {

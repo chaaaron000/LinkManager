@@ -19,6 +19,7 @@ Link Manager helps you move an existing folder into a storage root while preserv
 - Optionally move existing targets when changing the storage root. This option is on by default.
 - Validate managed links.
 - Remove entries from the manager without touching the file system.
+- Restore a linked folder back to its original path.
 - Delete only the symbolic link while preserving the real target folder.
 - Relaunch with administrator privileges when link operations require elevation.
 
@@ -130,6 +131,7 @@ This file stores only management metadata. The actual target folders remain wher
 - The app does not merge or overwrite an existing target path.
 - If the original folder is already a symbolic link, use the import flow instead of replacement.
 - `목록에서 제거` only removes the entry from `links.json`.
+- `링크 복원` removes the symbolic link, moves the target folder back to the original path, and removes the entry from `links.json`.
 - `링크 삭제` removes only the symbolic link and does not delete the target folder.
 - If link creation fails after moving a folder, the app attempts to restore the folder to the original path.
 

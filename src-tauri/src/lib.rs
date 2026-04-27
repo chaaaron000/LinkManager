@@ -605,6 +605,42 @@ fn delete_link(id: String) -> Result<Vec<ManagedLink>, String> {
 }
 
 #[tauri::command]
+fn restore_link_target(id: String) -> Result<Vec<ManagedLink>, String> {
+    if !is_running_as_admin() {
+        return Err("Administrator privileges are required".to_string());
+    }
+
+    let mut links = load_links()?;
+    let Some(index) = links.iter().position(|link| link.id == id) else {
+        return Err("Managed link not found".to_string());
+    };
+
+    let original = PathBuf::from(&links[index].original_path);
+    let target = PathBuf::from(&links[index].target_path);
+
+    if !target.exists() {
+        return Err("Target folder does not exist".to_string());
+    }
+    if !target.is_dir() {
+        return Err("Target path must be a folder".to_string());
+    }
+    if !is_symlink(&original).map_err(|err| err.to_string())? {
+        return Err("Original path must be a symbolic link".to_string());
+    }
+
+    fs::remove_dir(&original).map_err(|err| err.to_string())?;
+
+    if let Err(err) = move_dir_cross_volume(&target, &original) {
+        let _ = symlink_dir(&target, &original);
+        return Err(err);
+    }
+
+    links.remove(index);
+    save_links(&links)?;
+    Ok(links)
+}
+
+#[tauri::command]
 fn move_link_target_to_storage(id: String) -> Result<ManagedLink, String> {
     if !is_running_as_admin() {
         return Err("Administrator privileges are required".to_string());
@@ -725,6 +761,7 @@ pub fn run() {
             validate_link,
             remove_from_manager,
             delete_link,
+            restore_link_target,
             move_link_target_to_storage,
             relaunch_as_admin,
             reveal_path

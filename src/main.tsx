@@ -12,6 +12,7 @@ import {
   FolderOpen,
   Link2,
   RefreshCw,
+  RotateCcw,
   Search,
   Shield,
   Trash2,
@@ -456,16 +457,26 @@ function App() {
                 <div className="danger-zone">
                   <div>
                     <strong>위험 작업</strong>
-                    <span>심볼릭 링크 자체를 삭제합니다. 실제 대상 폴더는 보존됩니다.</span>
+                    <span>복원은 대상 폴더를 원래 경로로 이동하고, 삭제는 심볼릭 링크만 제거합니다.</span>
                   </div>
-                  <button className="danger" disabled={!isAdmin} onClick={() => runAction(async () => {
-                    const updated = await invoke<ManagedLink[]>("delete_link", { id: selected.id });
-                    setLinks(updated);
-                    setSelectedId(updated[0]?.id);
-                  }, "링크를 삭제했습니다. 대상 폴더는 유지됩니다.")}>
-                    <Trash2 size={16} />
-                    링크 삭제
-                  </button>
+                  <div className="danger-actions">
+                    <button disabled={!isAdmin} onClick={() => runAction(async () => {
+                      const updated = await invoke<ManagedLink[]>("restore_link_target", { id: selected.id });
+                      setLinks(updated);
+                      setSelectedId(updated[0]?.id);
+                    }, "대상 폴더를 원래 경로로 복원했습니다.")}>
+                      <RotateCcw size={16} />
+                      링크 복원
+                    </button>
+                    <button className="danger" disabled={!isAdmin} onClick={() => runAction(async () => {
+                      const updated = await invoke<ManagedLink[]>("delete_link", { id: selected.id });
+                      setLinks(updated);
+                      setSelectedId(updated[0]?.id);
+                    }, "링크를 삭제했습니다. 대상 폴더는 유지됩니다.")}>
+                      <Trash2 size={16} />
+                      링크 삭제
+                    </button>
+                  </div>
                 </div>
               </>
             ) : (
