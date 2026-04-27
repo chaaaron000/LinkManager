@@ -2,7 +2,7 @@
 
 [한국어](docs/README.ko.md) | [Documentation](docs/)
 
-Windows folder symbolic link manager built with Tauri, React, TypeScript, and Rust.
+Windows symbolic link manager built with Tauri, React, TypeScript, and Rust.
 
 Link Manager helps you move an existing folder into a storage root while preserving its original path as a directory symbolic link. It is useful when you want to relocate folders such as `C:\Users\User\.code` to another drive, while keeping programs that expect the original path working normally.
 
@@ -11,8 +11,8 @@ Link Manager helps you move an existing folder into a storage root while preserv
 - Replace an existing folder with a directory symbolic link.
 - Mirror the original path under the selected storage root.
 - Manage links in a tree view based on the original path.
-- Import an existing symbolic link manually.
-- Scan a root folder and import discovered directory symbolic links.
+- Import existing file and directory symbolic links manually.
+- Scan a root folder and import discovered file and directory symbolic links.
 - Configure a default symbolic-link storage root in a dedicated tab.
 - Move managed link targets that are outside the storage root into the mirrored storage layout.
 - Require a storage root before entering the app.
@@ -106,7 +106,7 @@ src-tauri\target\release\bundle\nsis\Link Manager_0.1.0_x64-setup.exe
 7. Run the replacement.
 8. Use the tree view to validate, open, remove, or delete managed links.
 
-To add links that already exist, click `기존 링크 추가`. You can select a single link or scan a root folder for directory symbolic links.
+To add links that already exist, click `기존 링크 추가`. You can select a single link or scan a root folder for file and directory symbolic links.
 
 Use the `보관 루트` tab to save the default storage root. If no storage root is configured, the app shows a blocking setup dialog on startup. When changing the storage root, the app can also move existing target folders into the new mirrored storage layout; this toggle is enabled by default.
 

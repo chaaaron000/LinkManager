@@ -4,7 +4,10 @@ use std::{
     env,
     ffi::OsStr,
     fs, io,
-    os::windows::{ffi::OsStrExt, fs::symlink_dir},
+    os::windows::{
+        ffi::OsStrExt,
+        fs::{symlink_dir, symlink_file},
+    },
     path::{Component, Path, PathBuf, Prefix},
     process::{exit, Command},
     ptr::null_mut,
@@ -20,6 +23,7 @@ use windows::Win32::{
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "PascalCase")]
 pub enum LinkKind {
+    FileSymlink,
     DirectorySymlink,
 }
 
@@ -75,6 +79,7 @@ pub struct ReplacePreview {
 pub struct ScanResult {
     pub original_path: String,
     pub target_path: String,
+    pub kind: LinkKind,
     pub already_managed: bool,
 }
 
@@ -277,6 +282,31 @@ fn copy_dir_recursive(from: &Path, to: &Path) -> io::Result<()> {
     Ok(())
 }
 
+fn move_file_cross_volume(from: &Path, to: &Path) -> Result<(), String> {
+    if let Some(parent) = to.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+
+    match fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(rename_err) => {
+            fs::copy(from, to).map_err(|err| {
+                format!("Failed to move file. Rename error: {rename_err}. Copy error: {err}")
+            })?;
+            fs::remove_file(from).map_err(|err| {
+                format!("Copied file to target, but failed to remove original: {err}")
+            })
+        }
+    }
+}
+
+fn move_path_cross_volume(kind: &LinkKind, from: &Path, to: &Path) -> Result<(), String> {
+    match kind {
+        LinkKind::FileSymlink => move_file_cross_volume(from, to),
+        LinkKind::DirectorySymlink => move_dir_cross_volume(from, to),
+    }
+}
+
 fn move_dir_cross_volume(from: &Path, to: &Path) -> Result<(), String> {
     if let Some(parent) = to.parent() {
         fs::create_dir_all(parent).map_err(|err| err.to_string())?;
@@ -292,6 +322,32 @@ fn move_dir_cross_volume(from: &Path, to: &Path) -> Result<(), String> {
                 format!("Copied folder to target, but failed to remove original: {err}")
             })
         }
+    }
+}
+
+fn create_symlink(kind: &LinkKind, target: &Path, link: &Path) -> Result<(), String> {
+    match kind {
+        LinkKind::FileSymlink => symlink_file(target, link),
+        LinkKind::DirectorySymlink => symlink_dir(target, link),
+    }
+    .map_err(|err| err.to_string())
+}
+
+fn remove_symlink_path(kind: &LinkKind, path: &Path) -> Result<(), String> {
+    match kind {
+        LinkKind::FileSymlink => fs::remove_file(path),
+        LinkKind::DirectorySymlink => fs::remove_dir(path),
+    }
+    .map_err(|err| err.to_string())
+}
+
+fn kind_for_target(target: &Path) -> Result<LinkKind, String> {
+    if target.is_dir() {
+        Ok(LinkKind::DirectorySymlink)
+    } else if target.is_file() {
+        Ok(LinkKind::FileSymlink)
+    } else {
+        Err("Only file and directory symbolic links are supported".to_string())
     }
 }
 
@@ -406,7 +462,7 @@ fn replace_folder(original_path: String, storage_root: String) -> Result<Managed
 
     move_dir_cross_volume(&original, &target)?;
 
-    match symlink_dir(&target, &original) {
+    match create_symlink(&LinkKind::DirectorySymlink, &target, &original) {
         Ok(()) => {}
         Err(err) => {
             let _ = fs::remove_dir(&original);
@@ -441,9 +497,7 @@ fn import_existing_link(original_path: String) -> Result<ManagedLink, String> {
         return Err("Selected path is not a symbolic link".to_string());
     }
     let target = read_link_target(&original)?;
-    if !target.is_dir() {
-        return Err("Only directory symbolic links are supported".to_string());
-    }
+    let kind = kind_for_target(&target)?;
 
     let name = original
         .file_name()
@@ -457,7 +511,7 @@ fn import_existing_link(original_path: String) -> Result<ManagedLink, String> {
         original_path: normalize_path_string(&original),
         target_path: normalize_path_string(&target),
         storage_root: None,
-        kind: LinkKind::DirectorySymlink,
+        kind,
         status: LinkStatus::Ok,
         created_at: now_secs(),
         last_checked_at: Some(now_secs()),
@@ -520,12 +574,13 @@ fn scan_existing_links_inner(
 
             if metadata.file_type().is_symlink() {
                 if let Ok(target) = fs::read_link(&path) {
-                    if target.is_dir() {
+                    if let Ok(kind) = kind_for_target(&target) {
                         let original_path = normalize_path_string(&path);
                         results.push(ScanResult {
                             already_managed: managed.contains(&original_path.to_lowercase()),
                             original_path,
                             target_path: normalize_path_string(&target),
+                            kind,
                         });
                         let _ = app_handle.emit(
                             "scan-progress",
@@ -596,7 +651,7 @@ fn delete_link(id: String) -> Result<Vec<ManagedLink>, String> {
                 "Refusing to delete because the original path is not a symbolic link".to_string(),
             );
         }
-        fs::remove_dir(&original).map_err(|err| err.to_string())?;
+        remove_symlink_path(&links[index].kind, &original)?;
     }
 
     links.remove(index);
@@ -619,19 +674,26 @@ fn restore_link_target(id: String) -> Result<Vec<ManagedLink>, String> {
     let target = PathBuf::from(&links[index].target_path);
 
     if !target.exists() {
-        return Err("Target folder does not exist".to_string());
+        return Err("Target path does not exist".to_string());
     }
-    if !target.is_dir() {
-        return Err("Target path must be a folder".to_string());
+    let kind = links[index].kind.clone();
+    match kind {
+        LinkKind::FileSymlink if !target.is_file() => {
+            return Err("Target path must be a file".to_string());
+        }
+        LinkKind::DirectorySymlink if !target.is_dir() => {
+            return Err("Target path must be a folder".to_string());
+        }
+        _ => {}
     }
     if !is_symlink(&original).map_err(|err| err.to_string())? {
         return Err("Original path must be a symbolic link".to_string());
     }
 
-    fs::remove_dir(&original).map_err(|err| err.to_string())?;
+    remove_symlink_path(&kind, &original)?;
 
-    if let Err(err) = move_dir_cross_volume(&target, &original) {
-        let _ = symlink_dir(&target, &original);
+    if let Err(err) = move_path_cross_volume(&kind, &target, &original) {
+        let _ = create_symlink(&kind, &target, &original);
         return Err(err);
     }
 
@@ -671,10 +733,17 @@ fn move_link_target_to_storage(id: String) -> Result<ManagedLink, String> {
     }
 
     if !current_target.exists() {
-        return Err("Current target folder does not exist".to_string());
+        return Err("Current target path does not exist".to_string());
     }
-    if !current_target.is_dir() {
-        return Err("Current target path must be a folder".to_string());
+    let kind = links[index].kind.clone();
+    match kind {
+        LinkKind::FileSymlink if !current_target.is_file() => {
+            return Err("Current target path must be a file".to_string());
+        }
+        LinkKind::DirectorySymlink if !current_target.is_dir() => {
+            return Err("Current target path must be a folder".to_string());
+        }
+        _ => {}
     }
     if !is_symlink(&original).map_err(|err| err.to_string())? {
         return Err("Original path must be a symbolic link".to_string());
@@ -686,15 +755,15 @@ fn move_link_target_to_storage(id: String) -> Result<ManagedLink, String> {
         );
     }
 
-    fs::remove_dir(&original).map_err(|err| err.to_string())?;
-    if let Err(err) = move_dir_cross_volume(&current_target, &next_target) {
-        let _ = symlink_dir(&current_target, &original);
+    remove_symlink_path(&kind, &original)?;
+    if let Err(err) = move_path_cross_volume(&kind, &current_target, &next_target) {
+        let _ = create_symlink(&kind, &current_target, &original);
         return Err(err);
     }
 
-    if let Err(err) = symlink_dir(&next_target, &original) {
-        let _ = move_dir_cross_volume(&next_target, &current_target);
-        let _ = symlink_dir(&current_target, &original);
+    if let Err(err) = create_symlink(&kind, &next_target, &original) {
+        let _ = move_path_cross_volume(&kind, &next_target, &current_target);
+        let _ = create_symlink(&kind, &current_target, &original);
         return Err(format!(
             "Moved target, but failed to recreate symlink: {err}"
         ));

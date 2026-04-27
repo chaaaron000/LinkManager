@@ -553,6 +553,10 @@ code {
   grid-template-columns: minmax(0, 1fr) 42px;
 }
 
+.path-input.multi div {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
 input {
   background: #fff;
   border: 1px solid #c8d0c4;

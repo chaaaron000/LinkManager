@@ -35,11 +35,13 @@ type ManagedLink = {
   original_path: string;
   target_path: string;
   storage_root: string | null;
-  kind: "DirectorySymlink";
+  kind: LinkKind;
   status: LinkStatus;
   created_at: number;
   last_checked_at: number | null;
 };
+
+type LinkKind = "FileSymlink" | "DirectorySymlink";
 
 type AppConfig = {
   storage_root: string | null;
@@ -64,6 +66,7 @@ type ReplacePreview = {
 type ScanResult = {
   original_path: string;
   target_path: string;
+  kind: LinkKind;
   already_managed: boolean;
 };
 
@@ -135,6 +138,10 @@ function statusLabel(status: LinkStatus): string {
     default:
       return "알 수 없음";
   }
+}
+
+function kindLabel(kind: LinkKind): string {
+  return kind === "FileSymlink" ? "파일 링크" : "폴더 링크";
 }
 
 function StatusBadge({ status }: { status: LinkStatus }) {
@@ -258,7 +265,7 @@ function LinkListView({
           <span className={`dot ${link.status === "Ok" ? "ok" : "warn"}`} />
           <span>
             <strong>{link.original_path}</strong>
-            <small>{link.target_path}</small>
+            <small>{kindLabel(link.kind)} · {link.target_path}</small>
           </span>
         </button>
       ))}
@@ -371,7 +378,7 @@ function App() {
       <header>
         <div>
           <h1>Link Manager</h1>
-          <p>원래 경로를 보존해서 폴더 심볼릭 링크를 관리합니다.</p>
+          <p>원래 경로를 보존해서 파일/폴더 심볼릭 링크를 관리합니다.</p>
         </div>
         <div className={`admin ${isAdmin ? "on" : ""}`}>
           <Shield size={16} />
@@ -468,6 +475,7 @@ function App() {
                   </div>
                 </div>
                 <Field label="원래 경로" value={selected.original_path} />
+                <Field label="종류" value={kindLabel(selected.kind)} />
                 <Field label="실제 대상 경로" value={selected.target_path} />
                 <Field label="보관 루트" value={selected.storage_root ?? "가져온 링크"} />
                 <Field label="마지막 검증" value={selected.last_checked_at ? new Date(selected.last_checked_at * 1000).toLocaleString() : "-"} />
@@ -867,6 +875,11 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
   }, [scanLog]);
 
   async function pickSingle() {
+    const selected = await open({ multiple: false });
+    if (typeof selected === "string") setSingle(selected);
+  }
+
+  async function pickSingleFolder() {
     const selected = await open({ directory: true, multiple: false });
     if (typeof selected === "string") setSingle(selected);
   }
@@ -927,7 +940,18 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
         </div>
 
         {activeImportTab === "manual" ? (
-          <PathInput label="단일 링크" value={single} onChange={setSingle} onPick={pickSingle} />
+          <label className="path-input multi">
+            <span>단일 링크</span>
+            <div>
+              <input value={single} onChange={(event) => setSingle(event.currentTarget.value)} placeholder="경로를 입력하거나 선택" />
+              <button onClick={pickSingle} type="button">
+                파일 선택
+              </button>
+              <button onClick={pickSingleFolder} type="button">
+                폴더 선택
+              </button>
+            </div>
+          </label>
         ) : (
           <>
             <PathInput label="스캔 루트" value={scanRoot} onChange={setScanRoot} onPick={pickScanRoot} />
@@ -975,7 +999,7 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
                     }}
                   />
                   <span>{item.original_path}</span>
-                  <small>{item.already_managed ? "이미 등록됨" : item.target_path}</small>
+                  <small>{item.already_managed ? "이미 등록됨" : `${kindLabel(item.kind)} · ${item.target_path}`}</small>
                 </label>
               ))}
             </div>
