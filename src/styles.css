@@ -125,6 +125,26 @@ p {
   padding: 12px 24px;
 }
 
+.tabs {
+  background: #e4eadf;
+  border: 1px solid #c8d0c4;
+  border-radius: 8px;
+  display: inline-flex;
+  gap: 2px;
+  margin-right: 8px;
+  padding: 3px;
+}
+
+.tabs button {
+  background: transparent;
+  border-color: transparent;
+}
+
+.tabs button.active {
+  background: #ffffff;
+  border-color: #c8d0c4;
+}
+
 .notice {
   background: #fff9df;
   border-bottom: 1px solid #ead98e;
@@ -272,6 +292,76 @@ code {
   gap: 9px;
   margin-top: 22px;
   padding-top: 18px;
+}
+
+.storage-page {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 22px 24px;
+}
+
+.storage-header {
+  border-bottom: 1px solid #d8ded4;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+}
+
+.settings-panel,
+.storage-list {
+  background: #f6f7f3;
+  border: 1px solid #d8ded4;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  padding: 16px;
+}
+
+.settings-panel .actions {
+  border-top: 0;
+  margin-top: 10px;
+  padding-top: 0;
+}
+
+.storage-list-head {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.storage-list-head span {
+  background: #ffffff;
+  border: 1px solid #d8ded4;
+  border-radius: 999px;
+  color: #566451;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.storage-row {
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid #d8ded4;
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  margin-top: 10px;
+  padding: 12px;
+}
+
+.storage-row strong {
+  display: block;
+  margin-bottom: 8px;
+}
+
+.storage-row code {
+  margin-top: 6px;
+}
+
+.empty.compact {
+  min-height: 88px;
 }
 
 .modal-backdrop {

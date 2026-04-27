@@ -49,9 +49,15 @@ pub struct ManagedLink {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppConfig {
+    pub storage_root: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppStateSnapshot {
     pub links: Vec<ManagedLink>,
     pub is_admin: bool,
+    pub config: AppConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -99,6 +105,10 @@ fn store_path() -> Result<PathBuf, String> {
     Ok(app_data_dir()?.join("links.json"))
 }
 
+fn config_path() -> Result<PathBuf, String> {
+    Ok(app_data_dir()?.join("config.json"))
+}
+
 fn load_links_from(path: &Path) -> Result<Vec<ManagedLink>, String> {
     if !path.exists() {
         return Ok(Vec::new());
@@ -124,6 +134,28 @@ fn load_links() -> Result<Vec<ManagedLink>, String> {
 
 fn save_links(links: &[ManagedLink]) -> Result<(), String> {
     save_links_to(&store_path()?, links)
+}
+
+fn load_config() -> Result<AppConfig, String> {
+    let path = config_path()?;
+    if !path.exists() {
+        return Ok(AppConfig { storage_root: None });
+    }
+    let text = fs::read_to_string(path).map_err(|err| err.to_string())?;
+    if text.trim().is_empty() {
+        return Ok(AppConfig { storage_root: None });
+    }
+    serde_json::from_str(&text).map_err(|err| err.to_string())
+}
+
+fn save_config(config: &AppConfig) -> Result<AppConfig, String> {
+    let path = config_path()?;
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).map_err(|err| err.to_string())?;
+    }
+    let text = serde_json::to_string_pretty(config).map_err(|err| err.to_string())?;
+    fs::write(path, text).map_err(|err| err.to_string())?;
+    Ok(config.clone())
 }
 
 fn wide_null(value: impl AsRef<OsStr>) -> Vec<u16> {
@@ -220,6 +252,15 @@ fn same_path(left: &Path, right: &Path) -> bool {
     left == right
 }
 
+fn path_is_under(path: &Path, root: &Path) -> bool {
+    let path = path.to_string_lossy().replace('/', "\\").to_lowercase();
+    let mut root = root.to_string_lossy().replace('/', "\\").to_lowercase();
+    while root.ends_with('\\') {
+        root.pop();
+    }
+    path == root || path.starts_with(&format!("{root}\\"))
+}
+
 fn copy_dir_recursive(from: &Path, to: &Path) -> io::Result<()> {
     fs::create_dir_all(to)?;
     for entry in fs::read_dir(from)? {
@@ -295,6 +336,21 @@ fn get_state() -> Result<AppStateSnapshot, String> {
     Ok(AppStateSnapshot {
         links,
         is_admin: is_running_as_admin(),
+        config: load_config()?,
+    })
+}
+
+#[tauri::command]
+fn set_storage_root(storage_root: String) -> Result<AppConfig, String> {
+    let root = expand_home(&storage_root)?;
+    if !root.exists() {
+        fs::create_dir_all(&root).map_err(|err| err.to_string())?;
+    }
+    if !root.is_dir() {
+        return Err("Storage root must be a folder".to_string());
+    }
+    save_config(&AppConfig {
+        storage_root: Some(normalize_path_string(&root)),
     })
 }
 
@@ -549,6 +605,75 @@ fn delete_link(id: String) -> Result<Vec<ManagedLink>, String> {
 }
 
 #[tauri::command]
+fn move_link_target_to_storage(id: String) -> Result<ManagedLink, String> {
+    if !is_running_as_admin() {
+        return Err("Administrator privileges are required".to_string());
+    }
+
+    let config = load_config()?;
+    let storage_root = config
+        .storage_root
+        .ok_or_else(|| "Storage root is not configured".to_string())?;
+    let storage = expand_home(&storage_root)?;
+
+    let mut links = load_links()?;
+    let Some(index) = links.iter().position(|link| link.id == id) else {
+        return Err("Managed link not found".to_string());
+    };
+
+    let original = PathBuf::from(&links[index].original_path);
+    let current_target = PathBuf::from(&links[index].target_path);
+    let next_target = mirrored_target_path(&original, &storage)?;
+
+    if path_is_under(&current_target, &storage) {
+        links[index].storage_root = Some(normalize_path_string(&storage));
+        links[index].status = status_for(&original, &current_target);
+        links[index].last_checked_at = Some(now_secs());
+        let updated = links[index].clone();
+        save_links(&links)?;
+        return Ok(updated);
+    }
+
+    if !current_target.exists() {
+        return Err("Current target folder does not exist".to_string());
+    }
+    if !current_target.is_dir() {
+        return Err("Current target path must be a folder".to_string());
+    }
+    if !is_symlink(&original).map_err(|err| err.to_string())? {
+        return Err("Original path must be a symbolic link".to_string());
+    }
+    if next_target.exists() {
+        return Err(
+            "Mirrored storage target already exists. Automatic merge/overwrite is disabled."
+                .to_string(),
+        );
+    }
+
+    fs::remove_dir(&original).map_err(|err| err.to_string())?;
+    if let Err(err) = move_dir_cross_volume(&current_target, &next_target) {
+        let _ = symlink_dir(&current_target, &original);
+        return Err(err);
+    }
+
+    if let Err(err) = symlink_dir(&next_target, &original) {
+        let _ = move_dir_cross_volume(&next_target, &current_target);
+        let _ = symlink_dir(&current_target, &original);
+        return Err(format!(
+            "Moved target, but failed to recreate symlink: {err}"
+        ));
+    }
+
+    links[index].target_path = normalize_path_string(&next_target);
+    links[index].storage_root = Some(normalize_path_string(&storage));
+    links[index].status = status_for(&original, &next_target);
+    links[index].last_checked_at = Some(now_secs());
+    let updated = links[index].clone();
+    save_links(&links)?;
+    Ok(updated)
+}
+
+#[tauri::command]
 fn relaunch_as_admin() -> Result<(), String> {
     let exe = env::current_exe().map_err(|err| err.to_string())?;
     let operation = wide_null("runas");
@@ -592,6 +717,7 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             get_state,
+            set_storage_root,
             preview_replace_folder,
             replace_folder,
             import_existing_link,
@@ -599,6 +725,7 @@ pub fn run() {
             validate_link,
             remove_from_manager,
             delete_link,
+            move_link_target_to_storage,
             relaunch_as_admin,
             reveal_path
         ])

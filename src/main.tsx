@@ -38,9 +38,14 @@ type ManagedLink = {
   last_checked_at: number | null;
 };
 
+type AppConfig = {
+  storage_root: string | null;
+};
+
 type AppStateSnapshot = {
   links: ManagedLink[];
   is_admin: boolean;
+  config: AppConfig;
 };
 
 type ReplacePreview = {
@@ -102,6 +107,12 @@ function buildTree(links: ManagedLink[]): TreeNode[] {
   }
 
   return roots.sort((a, b) => a.label.localeCompare(b.label));
+}
+
+function isPathUnder(path: string, root: string): boolean {
+  const cleanPath = path.replace(/\//g, "\\").replace(/\\+$/g, "").toLowerCase();
+  const cleanRoot = root.replace(/\//g, "\\").replace(/\\+$/g, "").toLowerCase();
+  return cleanPath === cleanRoot || cleanPath.startsWith(`${cleanRoot}\\`);
 }
 
 function statusLabel(status: LinkStatus): string {
@@ -197,6 +208,8 @@ function App() {
   const [replaceOpen, setReplaceOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
   const [leftPaneWidth, setLeftPaneWidth] = React.useState(420);
+  const [activeTab, setActiveTab] = React.useState<"links" | "storage">("links");
+  const [storageRoot, setStorageRoot] = React.useState("");
   const layoutRef = React.useRef<HTMLElement>(null);
 
   const selected = links.find((link) => link.id === selectedId) ?? links[0];
@@ -206,6 +219,7 @@ function App() {
     const state = await invoke<AppStateSnapshot>("get_state");
     setLinks(state.links);
     setIsAdmin(state.is_admin);
+    setStorageRoot(state.config.storage_root ?? "");
     if (!selectedId && state.links[0]) {
       setSelectedId(state.links[0].id);
     }
@@ -270,7 +284,15 @@ function App() {
       </header>
 
       <nav className="toolbar">
-        <button onClick={() => setReplaceOpen(true)} disabled={!isAdmin} title="폴더를 이동하고 심볼릭 링크로 대체">
+        <div className="tabs">
+          <button className={activeTab === "links" ? "active" : ""} onClick={() => setActiveTab("links")}>
+            링크 관리
+          </button>
+          <button className={activeTab === "storage" ? "active" : ""} onClick={() => setActiveTab("storage")}>
+            보관 루트
+          </button>
+        </div>
+        <button onClick={() => setReplaceOpen(true)} disabled={!isAdmin || !storageRoot} title="폴더를 이동하고 심볼릭 링크로 대체">
           <FolderInput size={17} />
           폴더 대체
         </button>
@@ -293,85 +315,109 @@ function App() {
 
       {message ? <div className="notice">{message}</div> : null}
 
-      <section
-        className="layout"
-        ref={layoutRef}
-        style={{ gridTemplateColumns: `${leftPaneWidth}px 8px minmax(0, 1fr)` }}
-      >
-        <aside>
-          <div className="pane-title">원래 경로 트리</div>
-          {tree.length ? (
-            <TreeView nodes={tree} selectedId={selected?.id} onSelect={(link) => setSelectedId(link.id)} />
-          ) : (
-            <div className="empty">관리 중인 링크가 없습니다.</div>
-          )}
-        </aside>
-        <div
-          className="splitter"
-          role="separator"
-          aria-orientation="vertical"
-          aria-label="좌우 패널 크기 조절"
-          title="드래그해서 좌우 패널 크기 조절"
-          onPointerDown={startResize}
-        />
+      {activeTab === "links" ? (
+        <section
+          className="layout"
+          ref={layoutRef}
+          style={{ gridTemplateColumns: `${leftPaneWidth}px 8px minmax(0, 1fr)` }}
+        >
+          <aside>
+            <div className="pane-title">원래 경로 트리</div>
+            {tree.length ? (
+              <TreeView nodes={tree} selectedId={selected?.id} onSelect={(link) => setSelectedId(link.id)} />
+            ) : (
+              <div className="empty">관리 중인 링크가 없습니다.</div>
+            )}
+          </aside>
+          <div
+            className="splitter"
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="좌우 패널 크기 조절"
+            title="드래그해서 좌우 패널 크기 조절"
+            onPointerDown={startResize}
+          />
 
-        <section className="detail">
-          {selected ? (
-            <>
-              <div className="detail-head">
-                <div>
-                  <h2>{selected.name}</h2>
-                  <StatusBadge status={selected.status} />
+          <section className="detail">
+            {selected ? (
+              <>
+                <div className="detail-head">
+                  <div>
+                    <h2>{selected.name}</h2>
+                    <StatusBadge status={selected.status} />
+                  </div>
                 </div>
-              </div>
-              <Field label="원래 경로" value={selected.original_path} />
-              <Field label="실제 대상 경로" value={selected.target_path} />
-              <Field label="보관 루트" value={selected.storage_root ?? "가져온 링크"} />
-              <Field label="마지막 검증" value={selected.last_checked_at ? new Date(selected.last_checked_at * 1000).toLocaleString() : "-"} />
+                <Field label="원래 경로" value={selected.original_path} />
+                <Field label="실제 대상 경로" value={selected.target_path} />
+                <Field label="보관 루트" value={selected.storage_root ?? "가져온 링크"} />
+                <Field label="마지막 검증" value={selected.last_checked_at ? new Date(selected.last_checked_at * 1000).toLocaleString() : "-"} />
 
-              <div className="actions">
-                <button onClick={() => runAction(async () => {
-                  const updated = await invoke<ManagedLink>("validate_link", { id: selected.id });
-                  setLinks((current) => current.map((link) => (link.id === updated.id ? updated : link)));
-                }, "검증했습니다.")}>
-                  <RefreshCw size={16} />
-                  검증
-                </button>
-                <button onClick={() => runAction(() => invoke("reveal_path", { path: selected.original_path }))}>
-                  <FolderOpen size={16} />
-                  링크 위치 열기
-                </button>
-                <button onClick={() => runAction(() => invoke("reveal_path", { path: selected.target_path }))}>
-                  <FolderOpen size={16} />
-                  대상 위치 열기
-                </button>
-                <button onClick={() => runAction(async () => {
-                  const updated = await invoke<ManagedLink[]>("remove_from_manager", { id: selected.id });
-                  setLinks(updated);
-                  setSelectedId(updated[0]?.id);
-                }, "관리 목록에서 제거했습니다.")}>
-                  <XCircle size={16} />
-                  목록에서 제거
-                </button>
-                <button className="danger" disabled={!isAdmin} onClick={() => runAction(async () => {
-                  const updated = await invoke<ManagedLink[]>("delete_link", { id: selected.id });
-                  setLinks(updated);
-                  setSelectedId(updated[0]?.id);
-                }, "링크를 삭제했습니다. 대상 폴더는 유지됩니다.")}>
-                  <Trash2 size={16} />
-                  링크 삭제
-                </button>
-              </div>
-            </>
-          ) : (
-            <div className="empty">왼쪽 트리에서 링크를 선택하세요.</div>
-          )}
+                <div className="actions">
+                  <button onClick={() => runAction(async () => {
+                    const updated = await invoke<ManagedLink>("validate_link", { id: selected.id });
+                    setLinks((current) => current.map((link) => (link.id === updated.id ? updated : link)));
+                  }, "검증했습니다.")}>
+                    <RefreshCw size={16} />
+                    검증
+                  </button>
+                  <button onClick={() => runAction(() => invoke("reveal_path", { path: selected.original_path }))}>
+                    <FolderOpen size={16} />
+                    링크 위치 열기
+                  </button>
+                  <button onClick={() => runAction(() => invoke("reveal_path", { path: selected.target_path }))}>
+                    <FolderOpen size={16} />
+                    대상 위치 열기
+                  </button>
+                  {storageRoot && !isPathUnder(selected.target_path, storageRoot) ? (
+                    <button disabled={!isAdmin} onClick={() => runAction(async () => {
+                      const updated = await invoke<ManagedLink>("move_link_target_to_storage", { id: selected.id });
+                      setLinks((current) => current.map((link) => (link.id === updated.id ? updated : link)));
+                    }, "대상 폴더를 보관 루트로 이동했습니다.")}>
+                      <FolderInput size={16} />
+                      보관 루트로 이동
+                    </button>
+                  ) : null}
+                  <button onClick={() => runAction(async () => {
+                    const updated = await invoke<ManagedLink[]>("remove_from_manager", { id: selected.id });
+                    setLinks(updated);
+                    setSelectedId(updated[0]?.id);
+                  }, "관리 목록에서 제거했습니다.")}>
+                    <XCircle size={16} />
+                    목록에서 제거
+                  </button>
+                  <button className="danger" disabled={!isAdmin} onClick={() => runAction(async () => {
+                    const updated = await invoke<ManagedLink[]>("delete_link", { id: selected.id });
+                    setLinks(updated);
+                    setSelectedId(updated[0]?.id);
+                  }, "링크를 삭제했습니다. 대상 폴더는 유지됩니다.")}>
+                    <Trash2 size={16} />
+                    링크 삭제
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="empty">왼쪽 트리에서 링크를 선택하세요.</div>
+            )}
+          </section>
         </section>
-      </section>
+      ) : (
+        <StorageRootPanel
+          isAdmin={isAdmin}
+          links={links}
+          storageRoot={storageRoot}
+          onStorageRootSaved={setStorageRoot}
+          onLinkMoved={(updated) => {
+            setLinks((current) => current.map((link) => (link.id === updated.id ? updated : link)));
+            setSelectedId(updated.id);
+          }}
+          runAction={runAction}
+        />
+      )}
 
       {replaceOpen ? (
         <ReplaceDialog
           onClose={() => setReplaceOpen(false)}
+          defaultStorageRoot={storageRoot}
           onCreated={(link) => {
             setLinks((current) => [...current.filter((item) => item.id !== link.id), link]);
             setSelectedId(link.id);
@@ -404,9 +450,109 @@ function Field({ label, value }: { label: string; value: string }) {
   );
 }
 
-function ReplaceDialog({ onClose, onCreated }: { onClose: () => void; onCreated: (link: ManagedLink) => void }) {
+function StorageRootPanel({
+  isAdmin,
+  links,
+  storageRoot,
+  onStorageRootSaved,
+  onLinkMoved,
+  runAction,
+}: {
+  isAdmin: boolean;
+  links: ManagedLink[];
+  storageRoot: string;
+  onStorageRootSaved: (path: string) => void;
+  onLinkMoved: (link: ManagedLink) => void;
+  runAction: (action: () => Promise<void>, success?: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = React.useState(storageRoot);
+  const outsideLinks = storageRoot ? links.filter((link) => !isPathUnder(link.target_path, storageRoot)) : links;
+
+  React.useEffect(() => {
+    setDraft(storageRoot);
+  }, [storageRoot]);
+
+  async function chooseRoot() {
+    const selected = await open({ directory: true, multiple: false });
+    if (typeof selected === "string") setDraft(selected);
+  }
+
+  return (
+    <section className="storage-page">
+      <div className="storage-header">
+        <div>
+          <h2>심볼릭 링크 보관 루트</h2>
+          <p>폴더를 대체하거나 기존 링크 대상을 정리할 때 사용할 기본 보관 위치입니다.</p>
+        </div>
+      </div>
+
+      <div className="settings-panel">
+        <PathInput label="보관 루트 폴더" value={draft} onChange={setDraft} onPick={chooseRoot} />
+        <div className="actions">
+          <button
+            className="primary"
+            disabled={!draft}
+            onClick={() => runAction(async () => {
+              const config = await invoke<AppConfig>("set_storage_root", { storageRoot: draft });
+              onStorageRootSaved(config.storage_root ?? "");
+            }, "보관 루트를 저장했습니다.")}
+          >
+            <FolderInput size={16} />
+            저장
+          </button>
+          {storageRoot ? <button onClick={() => runAction(() => invoke("reveal_path", { path: storageRoot }))}>
+            <FolderOpen size={16} />
+            보관 루트 열기
+          </button> : null}
+        </div>
+      </div>
+
+      <div className="storage-list">
+        <div className="storage-list-head">
+          <h2>보관 루트 밖의 대상 폴더</h2>
+          <span>{outsideLinks.length}개</span>
+        </div>
+        {!storageRoot ? (
+          <div className="empty compact">먼저 보관 루트를 저장하세요.</div>
+        ) : outsideLinks.length ? (
+          outsideLinks.map((link) => (
+            <div className="storage-row" key={link.id}>
+              <div>
+                <strong>{link.name}</strong>
+                <code>{link.original_path}</code>
+                <code>{link.target_path}</code>
+              </div>
+              <button
+                disabled={!isAdmin}
+                onClick={() => runAction(async () => {
+                  const updated = await invoke<ManagedLink>("move_link_target_to_storage", { id: link.id });
+                  onLinkMoved(updated);
+                }, "대상 폴더를 보관 루트로 이동했습니다.")}
+              >
+                <FolderInput size={16} />
+                보관 루트로 이동
+              </button>
+            </div>
+          ))
+        ) : (
+          <div className="empty compact">모든 대상 폴더가 보관 루트 안에 있습니다.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function ReplaceDialog({
+  onClose,
+  onCreated,
+  defaultStorageRoot,
+}: {
+  onClose: () => void;
+  onCreated: (link: ManagedLink) => void;
+  defaultStorageRoot: string;
+}) {
   const [original, setOriginal] = React.useState("");
-  const [root, setRoot] = React.useState("");
+  const [root, setRoot] = React.useState(defaultStorageRoot);
   const [preview, setPreview] = React.useState<ReplacePreview>();
   const [error, setError] = React.useState("");
 
