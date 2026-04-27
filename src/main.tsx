@@ -5,6 +5,8 @@ import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
+  ChevronDown,
+  ChevronRight,
   CheckCircle2,
   FolderInput,
   FolderOpen,
@@ -147,16 +149,27 @@ function StatusBadge({ status }: { status: LinkStatus }) {
 function TreeView({
   nodes,
   selectedId,
+  expanded,
+  onToggle,
   onSelect,
 }: {
   nodes: TreeNode[];
   selectedId?: string;
+  expanded: Set<string>;
+  onToggle: (path: string) => void;
   onSelect: (link: ManagedLink) => void;
 }) {
   return (
     <div className="tree">
       {nodes.map((node) => (
-        <TreeNodeView key={node.path} node={node} selectedId={selectedId} onSelect={onSelect} />
+        <TreeNodeView
+          key={node.path}
+          node={node}
+          selectedId={selectedId}
+          expanded={expanded}
+          onToggle={onToggle}
+          onSelect={onSelect}
+        />
       ))}
     </div>
   );
@@ -165,37 +178,55 @@ function TreeView({
 function TreeNodeView({
   node,
   selectedId,
+  expanded,
+  onToggle,
   onSelect,
   depth = 0,
 }: {
   node: TreeNode;
   selectedId?: string;
+  expanded: Set<string>;
+  onToggle: (path: string) => void;
   onSelect: (link: ManagedLink) => void;
   depth?: number;
 }) {
   const selected = node.link?.id === selectedId;
+  const hasChildren = node.children.length > 0;
+  const isExpanded = expanded.has(node.path);
   return (
     <div>
       <button
         className={`tree-row ${selected ? "selected" : ""}`}
         style={{ paddingLeft: 12 + depth * 16 }}
-        onClick={() => node.link && onSelect(node.link)}
-        disabled={!node.link}
+        onClick={() => (node.link ? onSelect(node.link) : hasChildren && onToggle(node.path))}
         title={node.link?.target_path ?? node.path}
       >
+        <span
+          className={`tree-expander ${hasChildren ? "" : "empty"}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            if (hasChildren) onToggle(node.path);
+          }}
+        >
+          {hasChildren ? isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} /> : null}
+        </span>
         {node.link ? <Link2 size={15} /> : <FolderOpen size={15} />}
-        <span>{node.label}</span>
+        <span className="tree-label">{node.label}</span>
         {node.link ? <span className={`dot ${node.link.status === "Ok" ? "ok" : "warn"}`} /> : null}
       </button>
-      {node.children.map((child) => (
-        <TreeNodeView
-          key={child.path}
-          node={child}
-          selectedId={selectedId}
-          onSelect={onSelect}
-          depth={depth + 1}
-        />
-      ))}
+      {isExpanded
+        ? node.children.map((child) => (
+            <TreeNodeView
+              key={child.path}
+              node={child}
+              selectedId={selectedId}
+              expanded={expanded}
+              onToggle={onToggle}
+              onSelect={onSelect}
+              depth={depth + 1}
+            />
+          ))
+        : null}
     </div>
   );
 }
@@ -211,6 +242,7 @@ function App() {
   const [activeTab, setActiveTab] = React.useState<"links" | "storage">("links");
   const [storageRoot, setStorageRoot] = React.useState("");
   const [stateLoaded, setStateLoaded] = React.useState(false);
+  const [expandedTreePaths, setExpandedTreePaths] = React.useState<Set<string>>(new Set());
   const layoutRef = React.useRef<HTMLElement>(null);
 
   const selected = links.find((link) => link.id === selectedId) ?? links[0];
@@ -240,6 +272,32 @@ function App() {
   React.useEffect(() => {
     refresh().catch((error) => setMessage(String(error)));
   }, []);
+
+  React.useEffect(() => {
+    setExpandedTreePaths((current) => {
+      if (current.size > 0) return current;
+      const next = new Set<string>();
+      const collect = (nodes: TreeNode[]) => {
+        for (const node of nodes) {
+          if (node.children.length > 0) {
+            next.add(node.path);
+            collect(node.children);
+          }
+        }
+      };
+      collect(tree);
+      return next;
+    });
+  }, [tree]);
+
+  function toggleTreePath(path: string) {
+    setExpandedTreePaths((current) => {
+      const next = new Set(current);
+      if (next.has(path)) next.delete(path);
+      else next.add(path);
+      return next;
+    });
+  }
 
   function startResize(event: React.PointerEvent<HTMLDivElement>) {
     const layout = layoutRef.current;
@@ -326,7 +384,13 @@ function App() {
           <aside>
             <div className="pane-title">원래 경로 트리</div>
             {tree.length ? (
-              <TreeView nodes={tree} selectedId={selected?.id} onSelect={(link) => setSelectedId(link.id)} />
+              <TreeView
+                nodes={tree}
+                selectedId={selected?.id}
+                expanded={expandedTreePaths}
+                onToggle={toggleTreePath}
+                onSelect={(link) => setSelectedId(link.id)}
+              />
             ) : (
               <div className="empty">관리 중인 링크가 없습니다.</div>
             )}

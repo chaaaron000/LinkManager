@@ -215,7 +215,19 @@ body.resizing .splitter {
   width: 100%;
 }
 
-.tree-row span:nth-child(2) {
+.tree-expander {
+  align-items: center;
+  display: inline-flex;
+  height: 16px;
+  justify-content: center;
+  width: 16px;
+}
+
+.tree-expander.empty {
+  visibility: hidden;
+}
+
+.tree-label {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
