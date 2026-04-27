@@ -196,6 +196,8 @@ function App() {
   const [message, setMessage] = React.useState("");
   const [replaceOpen, setReplaceOpen] = React.useState(false);
   const [importOpen, setImportOpen] = React.useState(false);
+  const [leftPaneWidth, setLeftPaneWidth] = React.useState(420);
+  const layoutRef = React.useRef<HTMLElement>(null);
 
   const selected = links.find((link) => link.id === selectedId) ?? links[0];
   const tree = React.useMemo(() => buildTree(links), [links]);
@@ -222,6 +224,37 @@ function App() {
   React.useEffect(() => {
     refresh().catch((error) => setMessage(String(error)));
   }, []);
+
+  function startResize(event: React.PointerEvent<HTMLDivElement>) {
+    const layout = layoutRef.current;
+    if (!layout) return;
+
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const bounds = layout.getBoundingClientRect();
+    const min = 260;
+    const max = Math.max(min, bounds.width - 420);
+
+    function resize(clientX: number) {
+      const next = Math.min(max, Math.max(min, clientX - bounds.left));
+      setLeftPaneWidth(next);
+    }
+
+    resize(event.clientX);
+
+    function onMove(moveEvent: PointerEvent) {
+      resize(moveEvent.clientX);
+    }
+
+    function onUp() {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.classList.remove("resizing");
+    }
+
+    document.body.classList.add("resizing");
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp, { once: true });
+  }
 
   return (
     <main>
@@ -260,7 +293,11 @@ function App() {
 
       {message ? <div className="notice">{message}</div> : null}
 
-      <section className="layout">
+      <section
+        className="layout"
+        ref={layoutRef}
+        style={{ gridTemplateColumns: `${leftPaneWidth}px 8px minmax(0, 1fr)` }}
+      >
         <aside>
           <div className="pane-title">원래 경로 트리</div>
           {tree.length ? (
@@ -269,6 +306,14 @@ function App() {
             <div className="empty">관리 중인 링크가 없습니다.</div>
           )}
         </aside>
+        <div
+          className="splitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="좌우 패널 크기 조절"
+          title="드래그해서 좌우 패널 크기 조절"
+          onPointerDown={startResize}
+        />
 
         <section className="detail">
           {selected ? (

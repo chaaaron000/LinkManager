@@ -13,6 +13,11 @@ body {
   margin: 0;
 }
 
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
 button,
 input {
   font: inherit;
@@ -131,16 +136,32 @@ p {
 .layout {
   display: grid;
   flex: 1;
-  grid-template-columns: 38% 62%;
   min-height: 0;
 }
 
 aside {
   background: #f6f7f3;
-  border-right: 1px solid #d8ded4;
   min-width: 0;
   overflow: auto;
   padding: 14px;
+}
+
+.splitter {
+  background: #d8ded4;
+  cursor: col-resize;
+  position: relative;
+}
+
+.splitter::after {
+  background: transparent;
+  content: "";
+  inset: 0 -5px;
+  position: absolute;
+}
+
+.splitter:hover,
+body.resizing .splitter {
+  background: #8fa184;
 }
 
 .detail {
