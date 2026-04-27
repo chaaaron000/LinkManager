@@ -1,5 +1,7 @@
 # Link Manager
 
+[한국어](README.ko.md)
+
 Windows folder symbolic link manager built with Tauri, React, TypeScript, and Rust.
 
 Link Manager helps you move an existing folder into a storage root while preserving its original path as a directory symbolic link. It is useful when you want to relocate folders such as `C:\Users\User\.code` to another drive, while keeping programs that expect the original path working normally.
