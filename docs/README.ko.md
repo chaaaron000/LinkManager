@@ -1,6 +1,6 @@
 # Link Manager
 
-[English](../README.md) | [문서 목록](index.md)
+[English](README.md) | [문서 목록](index.md)
 
 Tauri, React, TypeScript, Rust로 만든 Windows 심볼릭 링크 관리 프로그램입니다.
 

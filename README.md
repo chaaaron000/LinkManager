@@ -1,93 +1,93 @@
 # Link Manager
 
-[한국어](docs/README.ko.md) | [Documentation](docs/)
+[English](docs/README.md) | [문서 목록](docs/)
 
-Windows symbolic link manager built with Tauri, React, TypeScript, and Rust.
+Tauri, React, TypeScript, Rust로 만든 Windows 심볼릭 링크 관리 프로그램입니다.
 
-Link Manager helps you move an existing folder into a storage root while preserving its original path as a directory symbolic link. It is useful when you want to relocate folders such as `C:\Users\User\.code` to another drive, while keeping programs that expect the original path working normally.
+Link Manager는 기존 폴더를 다른 보관 루트로 이동한 뒤, 원래 경로에는 디렉터리 심볼릭 링크를 만들어 줍니다. 예를 들어 `C:\Users\User\.code` 같은 폴더를 다른 드라이브로 옮기면서도, 기존 경로를 기대하는 프로그램들이 그대로 동작하게 만들 수 있습니다.
 
-## Features
+## 주요 기능
 
-- Replace an existing folder with a directory symbolic link.
-- Mirror the original path under the selected storage root.
-- Manage links in a tree view based on the original path.
-- Import existing file and directory symbolic links manually.
-- Scan a root folder and import discovered file and directory symbolic links.
-- Configure a default symbolic-link storage root in a dedicated tab.
-- Move managed link targets that are outside the storage root into the mirrored storage layout.
-- Require a storage root before entering the app.
-- Optionally move existing targets when changing the storage root. This option is on by default.
-- Validate managed links.
-- Remove entries from the manager without touching the file system.
-- Restore a linked folder back to its original path.
-- Delete only the symbolic link while preserving the real target folder.
-- Relaunch with administrator privileges when link operations require elevation.
+- 기존 폴더를 디렉터리 심볼릭 링크로 대체합니다.
+- 선택한 보관 루트 아래에 원본 경로 구조를 그대로 재현합니다.
+- 원래 경로 기준 트리뷰로 관리 중인 링크를 보여줍니다.
+- 이미 존재하는 파일/폴더 심볼릭 링크를 수동으로 추가할 수 있습니다.
+- 루트 폴더를 스캔해서 발견된 파일/폴더 심볼릭 링크를 가져올 수 있습니다.
+- 별도 탭에서 기본 심볼릭 링크 보관 루트를 지정할 수 있습니다.
+- 보관 루트 밖에 있는 관리 대상 폴더를 미러링된 보관 루트 경로로 이동할 수 있습니다.
+- 보관 루트가 없으면 앱 진입 전에 필수 설정 팝업을 표시합니다.
+- 보관 루트 변경 시 기존 대상 폴더를 함께 이동할지 선택할 수 있으며 기본값은 켜짐입니다.
+- 관리 중인 링크 상태를 검증합니다.
+- 파일 시스템은 건드리지 않고 관리 목록에서만 제거할 수 있습니다.
+- 링크된 폴더를 원래 경로로 복원할 수 있습니다.
+- 실제 대상 폴더는 보존하고 심볼릭 링크만 삭제할 수 있습니다.
+- 링크 작업에 관리자 권한이 필요하면 관리자 권한으로 다시 실행할 수 있습니다.
 
-## Path Mirroring
+## 경로 미러링
 
-When replacing a folder, the app keeps the original path structure under the storage root.
+폴더를 대체할 때 앱은 원본 경로 구조를 보관 루트 아래에 그대로 만듭니다.
 
-Example:
+예시:
 
 ```text
-Original folder:
+원래 폴더:
 C:\Users\User\.code
 
-Storage root:
+보관 루트:
 D:\LinkStorage
 
-Actual moved folder:
+실제로 이동되는 폴더:
 D:\LinkStorage\C\Users\User\.code
 
-Symbolic link created at:
+생성되는 심볼릭 링크:
 C:\Users\User\.code -> D:\LinkStorage\C\Users\User\.code
 ```
 
-Drive letters are converted into normal folder names by removing the colon. The `~` prefix is expanded to the current user's home directory.
+드라이브 문자는 콜론을 제거한 일반 폴더명으로 변환됩니다. `~` 접두사는 현재 사용자의 홈 디렉터리로 확장됩니다.
 
-## Requirements
+## 요구 사항
 
-- Windows 10 or later.
+- Windows 10 이상.
 - Microsoft Edge WebView2 Runtime.
-- Node.js 22 or later for development.
-- Rust 1.94 or later for development.
-- Administrator privileges for creating and deleting symbolic links.
+- 개발 시 Node.js 22 이상.
+- 개발 시 Rust 1.94 이상.
+- 심볼릭 링크 생성 및 삭제에는 관리자 권한이 필요합니다.
 
-## Install Dependencies
+## 의존성 설치
 
 ```powershell
 npm install
 ```
 
-## Development
+## 개발 실행
 
-Run the Tauri development app:
+Tauri 개발 앱 실행:
 
 ```powershell
 npm run tauri dev
 ```
 
-Run only the Vite frontend:
+Vite 프론트엔드만 실행:
 
 ```powershell
 npm run dev
 ```
 
-## Build
+## 빌드
 
-Build the frontend:
+프론트엔드 빌드:
 
 ```powershell
 npm run build
 ```
 
-Build the Windows desktop app and installers:
+Windows 데스크톱 앱과 설치 파일 빌드:
 
 ```powershell
 npm run tauri build
 ```
 
-Generated outputs:
+생성되는 파일:
 
 ```text
 src-tauri\target\release\link-manager.exe
@@ -95,70 +95,70 @@ src-tauri\target\release\bundle\msi\Link Manager_0.1.0_x64_en-US.msi
 src-tauri\target\release\bundle\nsis\Link Manager_0.1.0_x64-setup.exe
 ```
 
-## Usage
+## 사용법
 
-1. Launch the app.
-2. If the app is not elevated, click `관리자 재실행`.
-3. Click `폴더 대체`.
-4. Select the original folder to relocate.
-5. Select the storage root where the real folder should be moved.
-6. Confirm the computed target path preview.
-7. Run the replacement.
-8. Use the tree view to validate, open, remove, or delete managed links.
+1. 앱을 실행합니다.
+2. 관리자 권한이 아니라면 `관리자 재실행`을 클릭합니다.
+3. `폴더 대체`를 클릭합니다.
+4. 이동할 원래 폴더를 선택합니다.
+5. 실제 폴더가 이동될 보관 루트를 선택합니다.
+6. 계산된 대상 경로 미리보기를 확인합니다.
+7. 대체 작업을 실행합니다.
+8. 트리뷰에서 링크를 검증하거나, 위치를 열거나, 목록에서 제거하거나, 링크를 삭제합니다.
 
-To add links that already exist, click `기존 링크 추가`. You can select a single link or scan a root folder for file and directory symbolic links.
+이미 존재하는 링크를 추가하려면 `기존 링크 추가`를 클릭합니다. 단일 링크를 선택하거나 루트 폴더를 스캔해서 파일/폴더 심볼릭 링크를 가져올 수 있습니다.
 
-Use the `보관 루트` tab to save the default storage root. If no storage root is configured, the app shows a blocking setup dialog on startup. When changing the storage root, the app can also move existing target folders into the new mirrored storage layout; this toggle is enabled by default.
+`보관 루트` 탭에서는 기본 보관 루트를 저장할 수 있습니다. 보관 루트가 지정되어 있지 않으면 앱 시작 시 필수 설정 팝업이 뜨며, 저장하기 전에는 앱을 사용할 수 없습니다. 보관 루트를 변경할 때는 기존 대상 폴더를 새 보관 루트의 원본 경로 미러링 구조로 함께 이동할 수 있고, 이 토글은 기본적으로 켜져 있습니다.
 
-## Data Storage
+## 데이터 저장 위치
 
-Managed link metadata is stored in:
+관리 중인 링크 메타데이터는 다음 위치에 저장됩니다.
 
 ```text
 %LOCALAPPDATA%\LinkManager\links.json
 ```
 
-The default storage root is stored in:
+기본 보관 루트 설정은 다음 위치에 저장됩니다.
 
 ```text
 %LOCALAPPDATA%\LinkManager\config.json
 ```
 
-This file stores only management metadata. The actual target folders remain wherever you moved them.
+이 파일에는 관리용 메타데이터만 저장됩니다. 실제 대상 폴더는 사용자가 이동한 위치에 그대로 남아 있습니다.
 
-## Safety Notes
+## 안전 규칙
 
-- The app does not merge or overwrite an existing target path.
-- If the original folder is already a symbolic link, use the import flow instead of replacement.
-- `목록에서 제거` only removes the entry from `links.json`.
-- `링크 복원` removes the symbolic link, moves the target folder back to the original path, and removes the entry from `links.json`.
-- `링크 삭제` removes only the symbolic link and does not delete the target folder.
-- If link creation fails after moving a folder, the app attempts to restore the folder to the original path.
+- 앱은 이미 존재하는 대상 경로에 자동 병합하거나 덮어쓰지 않습니다.
+- 원래 폴더가 이미 심볼릭 링크라면 폴더 대체 대신 가져오기 기능을 사용합니다.
+- `목록에서 제거`는 `links.json` 항목만 삭제합니다.
+- `링크 복원`은 심볼릭 링크를 제거하고 대상 폴더를 원래 경로로 되돌린 뒤 `links.json` 항목을 삭제합니다.
+- `링크 삭제`는 심볼릭 링크만 삭제하며 대상 폴더는 삭제하지 않습니다.
+- 폴더 이동 후 링크 생성이 실패하면 가능한 경우 폴더를 원래 경로로 복구합니다.
 
-## Tests
+## 테스트
 
-Run Rust tests:
+Rust 테스트 실행:
 
 ```powershell
 cd src-tauri
 cargo test
 ```
 
-Run frontend type check and production build:
+프론트엔드 타입 체크 및 프로덕션 빌드:
 
 ```powershell
 npm run build
 ```
 
-## Project Structure
+## 프로젝트 구조
 
 ```text
 src/
-  main.tsx       React UI and Tauri command calls
-  styles.css     Application styling
+  main.tsx       React UI와 Tauri command 호출
+  styles.css     애플리케이션 스타일
 
 src-tauri/
-  src/lib.rs     Rust commands, symlink logic, storage, validation
-  src/main.rs    Tauri entrypoint
+  src/lib.rs     Rust command, 심볼릭 링크 로직, 저장소, 검증
+  src/main.rs    Tauri 진입점
   tauri.conf.json
 ```
