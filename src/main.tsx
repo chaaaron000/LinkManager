@@ -232,6 +232,40 @@ function TreeNodeView({
   );
 }
 
+function LinkListView({
+  links,
+  selectedId,
+  onSelect,
+}: {
+  links: ManagedLink[];
+  selectedId?: string;
+  onSelect: (link: ManagedLink) => void;
+}) {
+  const sorted = React.useMemo(
+    () => [...links].sort((a, b) => a.original_path.localeCompare(b.original_path)),
+    [links],
+  );
+
+  return (
+    <div className="link-list">
+      {sorted.map((link) => (
+        <button
+          key={link.id}
+          className={`link-list-row ${link.id === selectedId ? "selected" : ""}`}
+          onClick={() => onSelect(link)}
+          title={link.target_path}
+        >
+          <span className={`dot ${link.status === "Ok" ? "ok" : "warn"}`} />
+          <span>
+            <strong>{link.original_path}</strong>
+            <small>{link.target_path}</small>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function App() {
   const [links, setLinks] = React.useState<ManagedLink[]>([]);
   const [isAdmin, setIsAdmin] = React.useState(false);
@@ -241,6 +275,7 @@ function App() {
   const [importOpen, setImportOpen] = React.useState(false);
   const [leftPaneWidth, setLeftPaneWidth] = React.useState(420);
   const [activeTab, setActiveTab] = React.useState<"links" | "storage">("links");
+  const [leftViewMode, setLeftViewMode] = React.useState<"tree" | "list">("tree");
   const [storageRoot, setStorageRoot] = React.useState("");
   const [stateLoaded, setStateLoaded] = React.useState(false);
   const [expandedTreePaths, setExpandedTreePaths] = React.useState<Set<string>>(new Set());
@@ -383,15 +418,33 @@ function App() {
           style={{ gridTemplateColumns: `${leftPaneWidth}px 8px minmax(0, 1fr)` }}
         >
           <aside>
-            <div className="pane-title">원래 경로 트리</div>
-            {tree.length ? (
-              <TreeView
-                nodes={tree}
-                selectedId={selected?.id}
-                expanded={expandedTreePaths}
-                onToggle={toggleTreePath}
-                onSelect={(link) => setSelectedId(link.id)}
-              />
+            <div className="pane-head">
+              <div className="pane-title">원래 경로</div>
+              <div className="pane-switch">
+                <button className={leftViewMode === "tree" ? "active" : ""} onClick={() => setLeftViewMode("tree")}>
+                  트리
+                </button>
+                <button className={leftViewMode === "list" ? "active" : ""} onClick={() => setLeftViewMode("list")}>
+                  목록
+                </button>
+              </div>
+            </div>
+            {links.length ? (
+              leftViewMode === "tree" ? (
+                <TreeView
+                  nodes={tree}
+                  selectedId={selected?.id}
+                  expanded={expandedTreePaths}
+                  onToggle={toggleTreePath}
+                  onSelect={(link) => setSelectedId(link.id)}
+                />
+              ) : (
+                <LinkListView
+                  links={links}
+                  selectedId={selected?.id}
+                  onSelect={(link) => setSelectedId(link.id)}
+                />
+              )
             ) : (
               <div className="empty">관리 중인 링크가 없습니다.</div>
             )}

@@ -189,11 +189,40 @@ body.resizing .splitter {
   padding: 22px 24px;
 }
 
+.pane-head {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
 .pane-title {
   color: #566451;
   font-size: 13px;
   font-weight: 700;
-  margin-bottom: 10px;
+}
+
+.pane-switch {
+  background: #e4eadf;
+  border: 1px solid #c8d0c4;
+  border-radius: 7px;
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+}
+
+.pane-switch button {
+  background: transparent;
+  border-color: transparent;
+  font-size: 12px;
+  min-height: 26px;
+  padding: 4px 8px;
+}
+
+.pane-switch button.active {
+  background: #ffffff;
+  border-color: #c8d0c4;
 }
 
 .tree {
@@ -236,6 +265,51 @@ body.resizing .splitter {
 .tree-row.selected {
   background: #e1e9dc;
   border-color: #bdd0b5;
+}
+
+.link-list {
+  display: grid;
+  gap: 6px;
+}
+
+.link-list-row {
+  align-items: flex-start;
+  background: #ffffff;
+  border: 1px solid #d8ded4;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 10px minmax(0, 1fr);
+  min-height: 0;
+  padding: 9px;
+  text-align: left;
+  width: 100%;
+}
+
+.link-list-row.selected {
+  background: #e1e9dc;
+  border-color: #bdd0b5;
+}
+
+.link-list-row .dot {
+  margin-top: 5px;
+}
+
+.link-list-row strong,
+.link-list-row small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-list-row strong {
+  font-size: 13px;
+}
+
+.link-list-row small {
+  color: #61705b;
+  font-size: 12px;
+  margin-top: 3px;
 }
 
 .dot {
