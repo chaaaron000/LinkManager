@@ -1,6 +1,6 @@
 # Link Manager
 
-[한국어](README.ko.md)
+[한국어](docs/README.ko.md) | [Documentation](docs/)
 
 Windows folder symbolic link manager built with Tauri, React, TypeScript, and Rust.
 
