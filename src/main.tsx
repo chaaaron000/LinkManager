@@ -451,6 +451,13 @@ function App() {
                     <XCircle size={16} />
                     목록에서 제거
                   </button>
+                </div>
+
+                <div className="danger-zone">
+                  <div>
+                    <strong>위험 작업</strong>
+                    <span>심볼릭 링크 자체를 삭제합니다. 실제 대상 폴더는 보존됩니다.</span>
+                  </div>
                   <button className="danger" disabled={!isAdmin} onClick={() => runAction(async () => {
                     const updated = await invoke<ManagedLink[]>("delete_link", { id: selected.id });
                     setLinks(updated);

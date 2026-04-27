@@ -306,6 +306,32 @@ code {
   padding-top: 18px;
 }
 
+.danger-zone {
+  align-items: center;
+  background: #fff7f4;
+  border: 1px solid #e6b7a9;
+  border-radius: 8px;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  margin-top: 24px;
+  padding: 14px;
+}
+
+.danger-zone div {
+  display: grid;
+  gap: 4px;
+}
+
+.danger-zone strong {
+  color: #8a1f1d;
+}
+
+.danger-zone span {
+  color: #7d5048;
+  font-size: 13px;
+}
+
 .storage-page {
   flex: 1;
   min-height: 0;
