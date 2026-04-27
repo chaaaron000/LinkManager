@@ -759,6 +759,7 @@ function ReplaceDialog({
 }
 
 function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
+  const [activeImportTab, setActiveImportTab] = React.useState<"manual" | "scan">("manual");
   const [single, setSingle] = React.useState("");
   const [scanRoot, setScanRoot] = React.useState("");
   const [results, setResults] = React.useState<ScanResult[]>([]);
@@ -768,6 +769,7 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
   const [scanProgress, setScanProgress] = React.useState<ScanProgress>();
   const [scanLog, setScanLog] = React.useState<string[]>([]);
   const logRef = React.useRef<HTMLDivElement>(null);
+  const selectableResults = results.filter((item) => !item.already_managed);
 
   React.useEffect(() => {
     const unlisten = listen<ScanProgress>("scan-progress", (event) => {
@@ -824,11 +826,13 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
   async function importAll() {
     try {
       setError("");
-      if (single) {
+      if (activeImportTab === "manual" && single) {
         await invoke("import_existing_link", { originalPath: single });
       }
-      for (const path of selected) {
-        await invoke("import_existing_link", { originalPath: path });
+      if (activeImportTab === "scan") {
+        for (const path of selected) {
+          await invoke("import_existing_link", { originalPath: path });
+        }
       }
       onImported();
     } catch (error) {
@@ -836,53 +840,80 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
     }
   }
 
+  const canImport = activeImportTab === "manual" ? Boolean(single) : selected.size > 0;
+
   return (
     <div className="modal-backdrop">
       <div className="modal wide">
         <h2>기존 링크 추가</h2>
-        <PathInput label="단일 링크" value={single} onChange={setSingle} onPick={pickSingle} />
-        <div className="divider" />
-        <PathInput label="스캔 루트" value={scanRoot} onChange={setScanRoot} onPick={pickScanRoot} />
-        <button onClick={scan} disabled={!scanRoot || isScanning}>
-          <Search size={16} />
-          {isScanning ? "스캔 중" : "루트 스캔"}
-        </button>
-        <div className="scan-progress">
-          <div className="scan-summary">
-            <span>스캔한 폴더 {scanProgress?.scanned_count ?? 0}</span>
-            <span>발견한 링크 {scanProgress?.found_count ?? results.length}</span>
-          </div>
-          <div className="scan-log" ref={logRef}>
-            {scanLog.length ? (
-              scanLog.map((line, index) => <code key={`${line}-${index}`}>{line}</code>)
-            ) : (
-              <span>스캔을 시작하면 현재 확인 중인 경로가 표시됩니다.</span>
-            )}
-          </div>
+        <div className="dialog-tabs">
+          <button className={activeImportTab === "manual" ? "active" : ""} onClick={() => setActiveImportTab("manual")}>
+            수동 선택
+          </button>
+          <button className={activeImportTab === "scan" ? "active" : ""} onClick={() => setActiveImportTab("scan")}>
+            루트 스캔
+          </button>
         </div>
-        <div className="scan-list">
-          {results.map((item) => (
-            <label key={item.original_path} className="scan-row">
-              <input
-                type="checkbox"
-                disabled={item.already_managed}
-                checked={selected.has(item.original_path)}
-                onChange={(event) => {
-                  const next = new Set(selected);
-                  if (event.currentTarget.checked) next.add(item.original_path);
-                  else next.delete(item.original_path);
-                  setSelected(next);
-                }}
-              />
-              <span>{item.original_path}</span>
-              <small>{item.already_managed ? "이미 등록됨" : item.target_path}</small>
-            </label>
-          ))}
-        </div>
+
+        {activeImportTab === "manual" ? (
+          <PathInput label="단일 링크" value={single} onChange={setSingle} onPick={pickSingle} />
+        ) : (
+          <>
+            <PathInput label="스캔 루트" value={scanRoot} onChange={setScanRoot} onPick={pickScanRoot} />
+            <div className="scan-actions">
+              <button onClick={scan} disabled={!scanRoot || isScanning}>
+                <Search size={16} />
+                {isScanning ? "스캔 중" : "루트 스캔"}
+              </button>
+              <button
+                onClick={() => setSelected(new Set(selectableResults.map((item) => item.original_path)))}
+                disabled={selectableResults.length === 0}
+              >
+                모두 선택
+              </button>
+              <button onClick={() => setSelected(new Set())} disabled={selected.size === 0}>
+                모두 해제
+              </button>
+            </div>
+            <div className="scan-progress">
+              <div className="scan-summary">
+                <span>스캔한 폴더 {scanProgress?.scanned_count ?? 0}</span>
+                <span>발견한 링크 {scanProgress?.found_count ?? results.length}</span>
+                <span>선택한 링크 {selected.size}</span>
+              </div>
+              <div className="scan-log" ref={logRef}>
+                {scanLog.length ? (
+                  scanLog.map((line, index) => <code key={`${line}-${index}`}>{line}</code>)
+                ) : (
+                  <span>스캔을 시작하면 현재 확인 중인 경로가 표시됩니다.</span>
+                )}
+              </div>
+            </div>
+            <div className="scan-list">
+              {results.map((item) => (
+                <label key={item.original_path} className="scan-row">
+                  <input
+                    type="checkbox"
+                    disabled={item.already_managed}
+                    checked={selected.has(item.original_path)}
+                    onChange={(event) => {
+                      const next = new Set(selected);
+                      if (event.currentTarget.checked) next.add(item.original_path);
+                      else next.delete(item.original_path);
+                      setSelected(next);
+                    }}
+                  />
+                  <span>{item.original_path}</span>
+                  <small>{item.already_managed ? "이미 등록됨" : item.target_path}</small>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
         {error ? <Warning text={error} /> : null}
         <div className="modal-actions">
           <button onClick={onClose}>취소</button>
-          <button className="primary" onClick={importAll} disabled={!single && selected.size === 0}>
+          <button className="primary" onClick={importAll} disabled={!canImport}>
             추가
           </button>
         </div>
