@@ -348,6 +348,58 @@ input {
   overflow: auto;
 }
 
+.scan-progress {
+  background: #eef3ea;
+  border: 1px solid #d8ded4;
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 10px;
+}
+
+.scan-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scan-summary span {
+  background: #ffffff;
+  border: 1px solid #d8ded4;
+  border-radius: 999px;
+  color: #566451;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 8px;
+}
+
+.scan-log {
+  background: #ffffff;
+  border: 1px solid #d8ded4;
+  border-radius: 7px;
+  color: #61705b;
+  display: grid;
+  gap: 4px;
+  max-height: 118px;
+  min-height: 72px;
+  overflow: auto;
+  padding: 7px;
+}
+
+.scan-log code {
+  border: 0;
+  border-radius: 4px;
+  font-size: 12px;
+  padding: 3px 5px;
+}
+
+.scan-log > span {
+  align-self: center;
+  font-size: 13px;
+  justify-self: center;
+}
+
 .scan-row {
   align-items: flex-start;
   background: #ffffff;

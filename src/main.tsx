@@ -1,6 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
 import { open } from "@tauri-apps/plugin-dialog";
 import {
   AlertTriangle,
@@ -56,6 +57,13 @@ type ScanResult = {
   original_path: string;
   target_path: string;
   already_managed: boolean;
+};
+
+type ScanProgress = {
+  current_path: string;
+  scanned_count: number;
+  found_count: number;
+  done: boolean;
 };
 
 type TreeNode = {
@@ -426,6 +434,34 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
   const [results, setResults] = React.useState<ScanResult[]>([]);
   const [selected, setSelected] = React.useState<Set<string>>(new Set());
   const [error, setError] = React.useState("");
+  const [isScanning, setIsScanning] = React.useState(false);
+  const [scanProgress, setScanProgress] = React.useState<ScanProgress>();
+  const [scanLog, setScanLog] = React.useState<string[]>([]);
+  const logRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    const unlisten = listen<ScanProgress>("scan-progress", (event) => {
+      setScanProgress(event.payload);
+      setScanLog((current) => {
+        const next = [...current, event.payload.current_path];
+        return next.slice(-160);
+      });
+      if (event.payload.done) {
+        setIsScanning(false);
+      }
+    });
+
+    return () => {
+      unlisten.then((dispose) => dispose());
+    };
+  }, []);
+
+  React.useEffect(() => {
+    const log = logRef.current;
+    if (log) {
+      log.scrollTop = log.scrollHeight;
+    }
+  }, [scanLog]);
 
   async function pickSingle() {
     const selected = await open({ directory: true, multiple: false });
@@ -440,10 +476,17 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
   async function scan() {
     try {
       setError("");
+      setResults([]);
+      setSelected(new Set());
+      setScanLog([]);
+      setScanProgress(undefined);
+      setIsScanning(true);
       const found = await invoke<ScanResult[]>("scan_existing_links", { rootPath: scanRoot });
       setResults(found);
       setSelected(new Set(found.filter((item) => !item.already_managed).map((item) => item.original_path)));
+      setIsScanning(false);
     } catch (error) {
+      setIsScanning(false);
       setError(String(error));
     }
   }
@@ -470,10 +513,23 @@ function ImportDialog({ onClose, onImported }: { onClose: () => void; onImported
         <PathInput label="단일 링크" value={single} onChange={setSingle} onPick={pickSingle} />
         <div className="divider" />
         <PathInput label="스캔 루트" value={scanRoot} onChange={setScanRoot} onPick={pickScanRoot} />
-        <button onClick={scan} disabled={!scanRoot}>
+        <button onClick={scan} disabled={!scanRoot || isScanning}>
           <Search size={16} />
-          루트 스캔
+          {isScanning ? "스캔 중" : "루트 스캔"}
         </button>
+        <div className="scan-progress">
+          <div className="scan-summary">
+            <span>스캔한 폴더 {scanProgress?.scanned_count ?? 0}</span>
+            <span>발견한 링크 {scanProgress?.found_count ?? results.length}</span>
+          </div>
+          <div className="scan-log" ref={logRef}>
+            {scanLog.length ? (
+              scanLog.map((line, index) => <code key={`${line}-${index}`}>{line}</code>)
+            ) : (
+              <span>스캔을 시작하면 현재 확인 중인 경로가 표시됩니다.</span>
+            )}
+          </div>
+        </div>
         <div className="scan-list">
           {results.map((item) => (
             <label key={item.original_path} className="scan-row">

@@ -10,6 +10,7 @@ use std::{
     ptr::null_mut,
     time::{SystemTime, UNIX_EPOCH},
 };
+use tauri::Emitter;
 use windows::core::PCWSTR;
 use windows::Win32::{
     Foundation::HWND,
@@ -69,6 +70,14 @@ pub struct ScanResult {
     pub original_path: String,
     pub target_path: String,
     pub already_managed: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ScanProgress {
+    pub current_path: String,
+    pub scanned_count: usize,
+    pub found_count: usize,
+    pub done: bool,
 }
 
 fn now_secs() -> u64 {
@@ -400,7 +409,19 @@ fn import_existing_link(original_path: String) -> Result<ManagedLink, String> {
 }
 
 #[tauri::command]
-fn scan_existing_links(root_path: String) -> Result<Vec<ScanResult>, String> {
+async fn scan_existing_links(
+    app_handle: tauri::AppHandle,
+    root_path: String,
+) -> Result<Vec<ScanResult>, String> {
+    tauri::async_runtime::spawn_blocking(move || scan_existing_links_inner(app_handle, root_path))
+        .await
+        .map_err(|err| err.to_string())?
+}
+
+fn scan_existing_links_inner(
+    app_handle: tauri::AppHandle,
+    root_path: String,
+) -> Result<Vec<ScanResult>, String> {
     let root = expand_home(&root_path)?;
     if !root.is_dir() {
         return Err("Scan root must be a folder".to_string());
@@ -412,8 +433,23 @@ fn scan_existing_links(root_path: String) -> Result<Vec<ScanResult>, String> {
         .collect();
     let mut results = Vec::new();
     let mut stack = vec![root];
+    let mut scanned_count = 0usize;
 
     while let Some(current) = stack.pop() {
+        scanned_count += 1;
+        let current_path = normalize_path_string(&current);
+        if scanned_count == 1 || scanned_count % 10 == 0 {
+            let _ = app_handle.emit(
+                "scan-progress",
+                ScanProgress {
+                    current_path: current_path.clone(),
+                    scanned_count,
+                    found_count: results.len(),
+                    done: false,
+                },
+            );
+        }
+
         let entries = match fs::read_dir(&current) {
             Ok(entries) => entries,
             Err(_) => continue,
@@ -435,6 +471,15 @@ fn scan_existing_links(root_path: String) -> Result<Vec<ScanResult>, String> {
                             original_path,
                             target_path: normalize_path_string(&target),
                         });
+                        let _ = app_handle.emit(
+                            "scan-progress",
+                            ScanProgress {
+                                current_path: normalize_path_string(&path),
+                                scanned_count,
+                                found_count: results.len(),
+                                done: false,
+                            },
+                        );
                     }
                 }
             } else if metadata.is_dir() {
@@ -444,6 +489,15 @@ fn scan_existing_links(root_path: String) -> Result<Vec<ScanResult>, String> {
     }
 
     results.sort_by(|a, b| a.original_path.cmp(&b.original_path));
+    let _ = app_handle.emit(
+        "scan-progress",
+        ScanProgress {
+            current_path: "Scan complete".to_string(),
+            scanned_count,
+            found_count: results.len(),
+            done: true,
+        },
+    );
     Ok(results)
 }
 
