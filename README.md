@@ -15,6 +15,8 @@ Link Manager helps you move an existing folder into a storage root while preserv
 - Scan a root folder and import discovered directory symbolic links.
 - Configure a default symbolic-link storage root in a dedicated tab.
 - Move managed link targets that are outside the storage root into the mirrored storage layout.
+- Require a storage root before entering the app.
+- Optionally move existing targets when changing the storage root. This option is on by default.
 - Validate managed links.
 - Remove entries from the manager without touching the file system.
 - Delete only the symbolic link while preserving the real target folder.
@@ -105,7 +107,7 @@ src-tauri\target\release\bundle\nsis\Link Manager_0.1.0_x64-setup.exe
 
 To add links that already exist, click `기존 링크 추가`. You can select a single link or scan a root folder for directory symbolic links.
 
-Use the `보관 루트` tab to save the default storage root. Links whose target folders are outside that root can be moved into the mirrored storage layout from that tab.
+Use the `보관 루트` tab to save the default storage root. If no storage root is configured, the app shows a blocking setup dialog on startup. When changing the storage root, the app can also move existing target folders into the new mirrored storage layout; this toggle is enabled by default.
 
 ## Data Storage
 

@@ -210,6 +210,7 @@ function App() {
   const [leftPaneWidth, setLeftPaneWidth] = React.useState(420);
   const [activeTab, setActiveTab] = React.useState<"links" | "storage">("links");
   const [storageRoot, setStorageRoot] = React.useState("");
+  const [stateLoaded, setStateLoaded] = React.useState(false);
   const layoutRef = React.useRef<HTMLElement>(null);
 
   const selected = links.find((link) => link.id === selectedId) ?? links[0];
@@ -220,6 +221,7 @@ function App() {
     setLinks(state.links);
     setIsAdmin(state.is_admin);
     setStorageRoot(state.config.storage_root ?? "");
+    setStateLoaded(true);
     if (!selectedId && state.links[0]) {
       setSelectedId(state.links[0].id);
     }
@@ -414,6 +416,16 @@ function App() {
         />
       )}
 
+      {stateLoaded && !storageRoot ? (
+        <RequiredStorageRootDialog
+          onSaved={(path) => {
+            setStorageRoot(path);
+            setActiveTab("links");
+            setMessage("보관 루트를 저장했습니다.");
+          }}
+        />
+      ) : null}
+
       {replaceOpen ? (
         <ReplaceDialog
           onClose={() => setReplaceOpen(false)}
@@ -466,7 +478,11 @@ function StorageRootPanel({
   runAction: (action: () => Promise<void>, success?: string) => Promise<void>;
 }) {
   const [draft, setDraft] = React.useState(storageRoot);
+  const [moveOnChange, setMoveOnChange] = React.useState(true);
   const outsideLinks = storageRoot ? links.filter((link) => !isPathUnder(link.target_path, storageRoot)) : links;
+  const changingRoot = Boolean(storageRoot && draft && !isPathUnder(storageRoot, draft));
+  const linksToMoveOnSave = draft ? links.filter((link) => !isPathUnder(link.target_path, draft)) : [];
+  const moveRequiresAdmin = moveOnChange && linksToMoveOnSave.length > 0;
 
   React.useEffect(() => {
     setDraft(storageRoot);
@@ -488,14 +504,36 @@ function StorageRootPanel({
 
       <div className="settings-panel">
         <PathInput label="보관 루트 폴더" value={draft} onChange={setDraft} onPick={chooseRoot} />
+        {changingRoot ? (
+          <label className="toggle-row">
+            <input
+              type="checkbox"
+              checked={moveOnChange}
+              onChange={(event) => setMoveOnChange(event.currentTarget.checked)}
+            />
+            <span>기존 대상 폴더도 새 보관 루트로 함께 이동</span>
+          </label>
+        ) : null}
+        {moveRequiresAdmin && !isAdmin ? (
+          <Warning text="기존 대상 폴더를 함께 이동하려면 관리자 권한이 필요합니다." />
+        ) : null}
+        {moveOnChange && draft && linksToMoveOnSave.length > 0 ? (
+          <div className="hint">저장 시 {linksToMoveOnSave.length}개 대상 폴더가 새 보관 루트로 이동됩니다.</div>
+        ) : null}
         <div className="actions">
           <button
             className="primary"
-            disabled={!draft}
+            disabled={!draft || (moveRequiresAdmin && !isAdmin)}
             onClick={() => runAction(async () => {
               const config = await invoke<AppConfig>("set_storage_root", { storageRoot: draft });
               onStorageRootSaved(config.storage_root ?? "");
-            }, "보관 루트를 저장했습니다.")}
+              if (moveOnChange) {
+                for (const link of linksToMoveOnSave) {
+                  const updated = await invoke<ManagedLink>("move_link_target_to_storage", { id: link.id });
+                  onLinkMoved(updated);
+                }
+              }
+            }, moveOnChange && linksToMoveOnSave.length > 0 ? "보관 루트를 저장하고 대상 폴더를 이동했습니다." : "보관 루트를 저장했습니다.")}
           >
             <FolderInput size={16} />
             저장
@@ -539,6 +577,43 @@ function StorageRootPanel({
         )}
       </div>
     </section>
+  );
+}
+
+function RequiredStorageRootDialog({ onSaved }: { onSaved: (path: string) => void }) {
+  const [root, setRoot] = React.useState("");
+  const [error, setError] = React.useState("");
+
+  async function chooseRoot() {
+    const selected = await open({ directory: true, multiple: false });
+    if (typeof selected === "string") setRoot(selected);
+  }
+
+  async function save() {
+    try {
+      setError("");
+      const config = await invoke<AppConfig>("set_storage_root", { storageRoot: root });
+      onSaved(config.storage_root ?? "");
+    } catch (error) {
+      setError(String(error));
+    }
+  }
+
+  return (
+    <div className="modal-backdrop locked">
+      <div className="modal">
+        <h2>보관 루트 설정 필요</h2>
+        <p>Link Manager를 사용하려면 심볼릭 링크 대상 폴더를 보관할 루트 폴더를 먼저 지정해야 합니다.</p>
+        <PathInput label="보관 루트 폴더" value={root} onChange={setRoot} onPick={chooseRoot} />
+        {error ? <Warning text={error} /> : null}
+        <div className="modal-actions">
+          <button className="primary" disabled={!root} onClick={save}>
+            <FolderInput size={16} />
+            저장하고 시작
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

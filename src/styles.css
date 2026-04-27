@@ -373,6 +373,10 @@ code {
   position: fixed;
 }
 
+.modal-backdrop.locked {
+  background: rgba(18, 26, 20, 0.55);
+}
+
 .modal {
   background: #f9faf7;
   border: 1px solid #c9d2c4;
@@ -437,6 +441,31 @@ input {
   gap: 8px;
   margin-top: 10px;
   padding: 9px 11px;
+}
+
+.hint {
+  background: #fff9df;
+  border: 1px solid #ead98e;
+  border-radius: 7px;
+  color: #695710;
+  font-size: 13px;
+  margin-top: 10px;
+  padding: 9px 11px;
+}
+
+.toggle-row {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid #d8ded4;
+  border-radius: 7px;
+  display: flex;
+  gap: 9px;
+  margin-top: 12px;
+  padding: 9px 11px;
+}
+
+.toggle-row input {
+  min-height: auto;
 }
 
 .modal-actions {
