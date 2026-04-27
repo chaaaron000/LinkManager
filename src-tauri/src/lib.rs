@@ -6,7 +6,7 @@ use std::{
     fs, io,
     os::windows::{ffi::OsStrExt, fs::symlink_dir},
     path::{Component, Path, PathBuf, Prefix},
-    process::Command,
+    process::{exit, Command},
     ptr::null_mut,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -568,7 +568,7 @@ fn relaunch_as_admin() -> Result<(), String> {
         return Err("Failed to relaunch with administrator privileges".to_string());
     }
 
-    Ok(())
+    exit(0);
 }
 
 #[tauri::command]
