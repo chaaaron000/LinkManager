@@ -6,6 +6,8 @@
 
 Link Manager는 Tauri 앱입니다. 화면은 React/TypeScript가 담당하고, Windows 파일 시스템 작업은 Rust가 담당합니다.
 
+이 프로젝트는 OpenAI Codex를 사용하여 개발했습니다.
+
 ```text
 .
 ├─ src/                         React 프론트엔드

@@ -6,6 +6,8 @@ This guide is for contributors who want to understand the Link Manager codebase.
 
 Link Manager is a Tauri app. React/TypeScript owns the UI, and Rust owns Windows file-system operations.
 
+This project was developed using OpenAI Codex.
+
 ```text
 .
 ├─ src/                         React frontend
